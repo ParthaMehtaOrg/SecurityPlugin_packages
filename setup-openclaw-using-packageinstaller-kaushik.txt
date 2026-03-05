@@ -1,0 +1,227 @@
+Setup Guide: OpenClaw + SecurityAgent Plugin Installation
+=========================================================
+
+This document records the full installation and troubleshooting steps
+performed on 2026-03-05 to set up OpenClaw with the SecurityAgent
+DLP plugin on macOS.
+
+Prerequisites:
+  - Node.js >= 22 (we had v24.13.0 via nvm)
+  - npm (we had v11.8.0)
+  - SecurityAgent repo cloned at /Users/parthamehta/SecurityAgent
+  - SecurityAgent binary package from:
+    https://github.com/kaushikdharamshi/Securityagent_packages.git
+
+
+========================================
+PHASE 1: Clean Slate (Remove Old State)
+========================================
+
+# Kill any lingering OpenClaw processes
+ps aux | grep openclaw
+kill -9 <pids>
+
+# Unload and remove the LaunchAgent
+launchctl unload ~/Library/LaunchAgents/ai.openclaw.gateway.plist
+rm ~/Library/LaunchAgents/ai.openclaw.gateway.plist
+
+# Remove all OpenClaw state/config
+rm -rf ~/.openclaw
+rm -rf ~/.openclaw-dev
+rm -rf ~/config/openclaw
+rm -rf ~/cache/openclaw
+
+
+==========================================
+PHASE 2: Install OpenClaw (npm, globally)
+==========================================
+
+npm install -g openclaw@latest
+
+# Verify
+openclaw --version
+# Expected: 2026.3.2 (or later)
+
+
+===================================================
+PHASE 3: Get the SecurityAgent Binary (for testing)
+===================================================
+
+mkdir -p /Users/parthamehta/TestSecurityAgent
+cd /Users/parthamehta/TestSecurityAgent
+
+git clone https://github.com/kaushikdharamshi/Securityagent_packages.git
+unzip Securityagent_packages/securityagent-macOS.zip
+
+# Verify the binary runs
+./securityagent
+# Expected: usage help showing watch/scan/status commands
+
+NOTE: The binary is a standalone endpoint agent CLI. It is NOT an
+OpenClaw plugin. Do not install it as a plugin (see Phase 6 for
+the mistake we made and how to fix it).
+
+
+======================================
+PHASE 4: Configure OpenClaw Gateway
+======================================
+
+# Set gateway to local mode (required for local-only usage)
+openclaw config set gateway.mode local
+
+# Install the gateway as a LaunchAgent (auto-starts on boot)
+openclaw gateway install
+
+# Start/restart the gateway
+openclaw gateway restart
+
+# Verify it's running
+openclaw gateway status
+# Expected: "Runtime: running", "RPC probe: ok", "Listening: 127.0.0.1:18789"
+
+TROUBLESHOOTING: If gateway status shows:
+  "Gateway start blocked: set gateway.mode=local"
+Then you forgot to run: openclaw config set gateway.mode local
+
+
+============================================================
+PHASE 5: Install SecurityAgent OpenClaw Plugin (THE RIGHT WAY)
+============================================================
+
+The proper plugin lives in the SecurityAgent repo at:
+  /Users/parthamehta/SecurityAgent/integrations/openclaw/
+
+It contains index.ts and openclaw.plugin.json — this is what OpenClaw
+expects for a plugin (TypeScript entry point, not a binary).
+
+# Run the install script from the SecurityAgent repo
+/Users/parthamehta/SecurityAgent/scripts/install_openclaw_plugin.sh
+
+What this script does:
+  1. Copies index.ts + openclaw.plugin.json to ~/.openclaw/extensions/security-agent/
+  2. Writes .secagent_root marker pointing to the SecurityAgent repo
+  3. Computes SHA256 checksums for supply-chain integrity
+  4. Patches openclaw.json:
+     - Adds tools.deny: ["read", "exec"]  (blocks native read/exec)
+     - Adds plugins.allow: ["security-agent"]
+  5. Verifies the plugin loads
+
+# Restart gateway to pick up the plugin
+openclaw gateway restart
+
+# Verify plugin is loaded
+openclaw plugins list
+# Expected: security-agent shows as "loaded"
+
+# Test in TUI
+openclaw tui
+# Try: "Read ~/.env" -> should be BLOCKED by SecurityAgent DLP
+
+
+========================================================================
+PHASE 6: MISTAKES WE MADE (and fixes) — DO NOT REPEAT
+========================================================================
+
+MISTAKE 1: Installing the binary as an OpenClaw plugin
+-------------------------------------------------------
+We ran:
+  openclaw plugins install securityagent
+  openclaw plugins install ./securityagent
+
+This copied the Mach-O binary into ~/.openclaw/extensions/securityagent.
+OpenClaw plugins need an index.ts entry point — a raw binary doesn't work.
+OpenClaw silently ignored it and showed "plugin not found: securityagent"
+config warnings on every command.
+
+FIX:
+  rm -f ~/.openclaw/extensions/securityagent
+  openclaw config unset plugins.entries.securityagent
+
+Then edit ~/.openclaw/openclaw.json and remove the stale entry from
+plugins.installs:
+  "securityagent": { "source": "path", ... }
+
+Change it to:
+  "installs": {}
+
+
+MISTAKE 2: "thinking or redacted_thinking blocks" API error
+------------------------------------------------------------
+After uninstalling the old security-agent plugin mid-session, the
+OpenClaw TUI kept hitting HTTP 400 errors:
+  "thinking or redacted_thinking blocks in the latest assistant
+   message cannot be modified"
+
+This is a corrupted conversation context — the LLM provider rejects
+messages where thinking blocks were altered.
+
+FIX:
+  Start a new TUI session (Ctrl+C and reopen openclaw tui).
+  The error is per-session, not persistent.
+
+
+MISTAKE 3: Gateway not starting after install
+----------------------------------------------
+After running "openclaw gateway install", the gateway wouldn't start:
+  "Gateway start blocked: set gateway.mode=local"
+
+FIX:
+  openclaw config set gateway.mode local
+  openclaw gateway restart
+
+
+==================================
+PHASE 7: Verify Everything Works
+==================================
+
+# 1. Gateway is running
+openclaw gateway status
+# Expected: "RPC probe: ok"
+
+# 2. Plugin is loaded
+openclaw plugins list
+# Expected: security-agent -> loaded
+
+# 3. DLP blocking works
+openclaw tui
+> Read ~/.env
+# Expected: BLOCKED by SecurityAgent (filename gate)
+
+> Read ~/.ssh/id_rsa
+# Expected: BLOCKED by SecurityAgent (filename gate)
+
+> Run: cat ~/.env
+# Expected: BLOCKED by exec guard (dotfile_read rule)
+
+> Run: env
+# Expected: BLOCKED by exec guard (env_dump rule)
+
+> Read README.md
+# Expected: Content returned normally (clean file)
+
+
+=====================
+PHASE 8: Uninstall
+=====================
+
+To remove the SecurityAgent plugin:
+  /Users/parthamehta/SecurityAgent/scripts/install_openclaw_plugin.sh --uninstall
+  openclaw gateway restart
+
+To fully remove OpenClaw:
+  openclaw uninstall
+  npm uninstall -g openclaw
+
+
+===================
+File Locations
+===================
+
+SecurityAgent repo:        /Users/parthamehta/SecurityAgent
+SecurityAgent binary:      /Users/parthamehta/TestSecurityAgent/securityagent
+Binary packages:           /Users/parthamehta/TestSecurityAgent/Securityagent_packages/
+OpenClaw config:           ~/.openclaw/openclaw.json
+OpenClaw plugin (proper):  ~/.openclaw/extensions/security-agent/index.ts
+Plugin install script:     /Users/parthamehta/SecurityAgent/scripts/install_openclaw_plugin.sh
+Gateway logs:              ~/.openclaw/logs/gateway.log
+Gateway LaunchAgent:       ~/Library/LaunchAgents/ai.openclaw.gateway.plist
