@@ -2,7 +2,7 @@
 
 ## Overview
 
-SecurityAgent is a DLP (Data Loss Prevention) plugin for [OpenClaw](https://openclaw.dev) that intercepts all file reads and command executions, blocking access to sensitive data before it reaches the AI model.
+SecurityAgent is a DLP (Data Loss Prevention) plugin for [OpenClaw](https://openclaw.ai) that intercepts all file reads and command executions, blocking access to sensitive data before it reaches the AI model.
 
 **What gets blocked:**
 - Sensitive files (`.env`, `.pem`, `credentials.json`, SSH keys, etc.)
