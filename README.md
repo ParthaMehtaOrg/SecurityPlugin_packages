@@ -79,7 +79,27 @@ openclaw gateway status
 # Expected: "Runtime: running", "RPC probe: ok"
 ```
 
-### Step 3: Download the Plugin Package
+### Step 3: Configure LLM Provider
+
+OpenClaw needs an API key to talk to the LLM. Run the interactive setup wizard:
+
+```bash
+openclaw configure --section model
+```
+
+When prompted:
+1. Select **Anthropic** as the provider
+2. Enter your Anthropic API key
+
+Verify it's configured:
+```bash
+openclaw gateway restart
+```
+
+> **Note:** Without this step, `openclaw tui` will fail with:
+> `No API key found for provider "anthropic"`
+
+### Step 4: Download the Plugin Package
 
 ```bash
 # Clone this repository
@@ -87,7 +107,7 @@ git clone https://github.com/kaushikdharamshi/Securityagent_packages.git
 cd Securityagent_packages
 ```
 
-### Step 4: Unzip the Plugin for Your OS
+### Step 5: Unzip the Plugin for Your OS
 
 **macOS:**
 ```bash
@@ -107,7 +127,7 @@ Expand-Archive securityagent-plugin-Windows.zip -DestinationPath .
 cd securityagent-plugin-Windows\securityagent-plugin-Windows
 ```
 
-### Step 5: Install the Plugin
+### Step 6: Install the Plugin
 
 ```bash
 # Make the binary executable
@@ -157,7 +177,7 @@ This will:
 # Expected: exit 1 (blocked, JSON error on stderr)
 ```
 
-### Step 6: Restart OpenClaw and Verify
+### Step 7: Restart OpenClaw and Verify
 
 ```bash
 openclaw gateway restart
