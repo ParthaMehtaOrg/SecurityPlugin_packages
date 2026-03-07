@@ -41,8 +41,24 @@ Each **plugin zip** contains:
 
 ### Step 1: Install OpenClaw
 
+**Option A — One-liner (recommended):**
+```bash
+curl -fsSL https://openclaw.ai/install.sh | bash
+openclaw onboard
+```
+
+**Option B — Via npm:**
 ```bash
 npm install -g openclaw@latest
+```
+
+**Option C — Via pnpm:**
+```bash
+pnpm add -g openclaw
+```
+
+Verify the installation:
+```bash
 openclaw --version
 ```
 
