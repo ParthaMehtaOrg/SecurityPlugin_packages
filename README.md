@@ -92,34 +92,70 @@ cd Securityagent_packages
 **macOS:**
 ```bash
 unzip securityagent-plugin-macOS.zip
-cd securityagent-plugin-macOS
+cd securityagent-plugin-macOS/securityagent-plugin-macOS
 ```
 
 **Linux:**
 ```bash
 unzip securityagent-plugin-Linux.zip
-cd securityagent-plugin-Linux
+cd securityagent-plugin-Linux/securityagent-plugin-Linux
 ```
 
 **Windows:**
 ```powershell
 Expand-Archive securityagent-plugin-Windows.zip -DestinationPath .
-cd securityagent-plugin-Windows
+cd securityagent-plugin-Windows\securityagent-plugin-Windows
 ```
 
-### Step 5: Run the Installer
+### Step 5: Install the Plugin
 
 ```bash
-chmod +x install_openclaw_plugin.sh securityagent-plugin
+# Make the binary executable
+chmod +x securityagent-plugin
 
-./install_openclaw_plugin.sh --binary ./securityagent-plugin
+# Create the plugin directory
+mkdir -p ~/.openclaw/extensions/security-agent
+
+# Copy plugin files
+cp index.ts ~/.openclaw/extensions/security-agent/
+cp openclaw.plugin.json ~/.openclaw/extensions/security-agent/
+cp securityagent-plugin ~/.openclaw/extensions/security-agent/
+
+# Patch openclaw.json to deny native read/exec and allow the plugin
+python3 -c "
+import json
+cfg_path = '$HOME/.openclaw/openclaw.json'
+with open(cfg_path) as f:
+    cfg = json.load(f)
+cfg.setdefault('tools', {}).setdefault('deny', [])
+for t in ('read', 'exec'):
+    if t not in cfg['tools']['deny']:
+        cfg['tools']['deny'].append(t)
+cfg.setdefault('plugins', {}).setdefault('allow', [])
+if 'security-agent' not in cfg['plugins']['allow']:
+    cfg['plugins']['allow'].append('security-agent')
+with open(cfg_path, 'w') as f:
+    json.dump(cfg, f, indent=2)
+    f.write('\n')
+print('openclaw.json patched')
+"
 ```
 
 This will:
-1. Copy `index.ts` and `openclaw.plugin.json` to `~/.openclaw/extensions/security-agent/`
-2. Copy the `securityagent-plugin` binary to the plugin directory
-3. Patch `openclaw.json` to deny native `read`/`exec` tools and enable the plugin
-4. Run a smoke test on the binary
+1. Copy `index.ts`, `openclaw.plugin.json`, and the `securityagent-plugin` binary to `~/.openclaw/extensions/security-agent/`
+2. Patch `openclaw.json` to deny native `read`/`exec` tools and allow the plugin
+
+**Smoke test the binary:**
+```bash
+~/.openclaw/extensions/security-agent/securityagent-plugin --version
+# Expected: securityagent-plugin 1.0.0
+
+~/.openclaw/extensions/security-agent/securityagent-plugin --exec "echo hello"
+# Expected: exit 0 (clean)
+
+~/.openclaw/extensions/security-agent/securityagent-plugin --exec "cat ~/.env"
+# Expected: exit 1 (blocked, JSON error on stderr)
+```
 
 ### Step 6: Restart OpenClaw and Verify
 
@@ -191,16 +227,44 @@ echo "SSN: 123-45-6789" > /tmp/test_pii.txt
 
 ```bash
 # Remove the SecurityAgent plugin
-~/.openclaw/extensions/security-agent/../../../scripts/install_openclaw_plugin.sh --uninstall
-# Or manually:
 rm -rf ~/.openclaw/extensions/security-agent
+
+# Remove tools.deny and plugins.allow entries from openclaw.json
+python3 -c "
+import json
+cfg_path = '$HOME/.openclaw/openclaw.json'
+with open(cfg_path) as f:
+    cfg = json.load(f)
+changed = False
+if 'tools' in cfg and 'deny' in cfg['tools']:
+    for t in ('read', 'exec'):
+        if t in cfg['tools']['deny']:
+            cfg['tools']['deny'].remove(t)
+            changed = True
+    if not cfg['tools']['deny']: del cfg['tools']['deny']
+    if not cfg['tools']: del cfg['tools']
+if 'plugins' in cfg and 'allow' in cfg['plugins']:
+    if 'security-agent' in cfg['plugins']['allow']:
+        cfg['plugins']['allow'].remove('security-agent')
+        changed = True
+    if not cfg['plugins']['allow']: del cfg['plugins']['allow']
+    if not cfg['plugins']: del cfg['plugins']
+if changed:
+    with open(cfg_path, 'w') as f:
+        json.dump(cfg, f, indent=2)
+        f.write('\n')
+    print('openclaw.json cleaned')
+else:
+    print('openclaw.json already clean')
+"
 
 # Restart gateway to apply
 openclaw gateway restart
 
 # To fully remove OpenClaw:
-openclaw uninstall
+openclaw gateway stop
 npm uninstall -g openclaw
+rm -rf ~/.openclaw
 ```
 
 ---
