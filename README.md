@@ -81,23 +81,21 @@ openclaw gateway status
 
 ### Step 3: Configure LLM Provider
 
-OpenClaw needs an API key to talk to the LLM. Run the interactive setup wizard:
+OpenClaw needs an API key for your chosen LLM provider. Run the interactive setup wizard:
 
 ```bash
 openclaw configure --section model
 ```
 
-When prompted:
-1. Select **Anthropic** as the provider
-2. Enter your Anthropic API key
+When prompted, select your provider and enter the API key. Supported providers include Anthropic, OpenAI, Google Gemini, Ollama (local), and others.
 
-Verify it's configured:
+Restart the gateway to apply:
 ```bash
 openclaw gateway restart
 ```
 
 > **Note:** Without this step, `openclaw tui` will fail with:
-> `No API key found for provider "anthropic"`
+> `No API key found for provider "<provider>"`
 
 ### Step 4: Download the Plugin Package
 
