@@ -110,19 +110,19 @@ cd Securityagent_packages
 **macOS:**
 ```bash
 unzip securityagent-plugin-macOS.zip
-cd securityagent-plugin-macOS/securityagent-plugin-macOS
+cd securityagent-plugin-macOS
 ```
 
 **Linux:**
 ```bash
 unzip securityagent-plugin-Linux.zip
-cd securityagent-plugin-Linux/securityagent-plugin-Linux
+cd securityagent-plugin-Linux
 ```
 
 **Windows:**
 ```powershell
 Expand-Archive securityagent-plugin-Windows.zip -DestinationPath .
-cd securityagent-plugin-Windows\securityagent-plugin-Windows
+cd securityagent-plugin-Windows
 ```
 
 ### Step 6: Install the Plugin
