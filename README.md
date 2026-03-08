@@ -1,8 +1,8 @@
-# SecurityAgent + OpenClaw Setup Guide
+# SecurityPlugin + OpenClaw Setup Guide
 
 ## Overview
 
-SecurityAgent is a DLP (Data Loss Prevention) plugin for [OpenClaw](https://openclaw.ai) that intercepts all file reads and command executions, blocking access to sensitive data before it reaches the AI model.
+SecurityPlugin is a DLP (Data Loss Prevention) plugin for [OpenClaw](https://openclaw.ai) that intercepts all file reads and command executions, blocking access to sensitive data before it reaches the AI model.
 
 **What gets blocked:**
 - Sensitive files (`.env`, `.pem`, `credentials.json`, SSH keys, etc.)
@@ -15,14 +15,14 @@ SecurityAgent is a DLP (Data Loss Prevention) plugin for [OpenClaw](https://open
 
 | File | Description |
 |------|-------------|
-| `securityagent-plugin-macOS.zip` | OpenClaw DLP plugin binary (macOS) |
-| `securityagent-plugin-Windows.zip` | OpenClaw DLP plugin binary (Windows) |
-| `securityagent-plugin-Linux.zip` | OpenClaw DLP plugin binary (Linux) |
-| `securityagent-macOS.zip` | Full SecurityAgent endpoint binary (macOS) |
-| `securityagent-Windows.zip` | Full SecurityAgent endpoint binary (Windows) |
+| `securityplugin-plugin-macOS.zip` | OpenClaw DLP plugin binary (macOS) |
+| `securityplugin-plugin-Windows.zip` | OpenClaw DLP plugin binary (Windows) |
+| `securityplugin-plugin-Linux.zip` | OpenClaw DLP plugin binary (Linux) |
+| `securityplugin-macOS.zip` | Full SecurityPlugin endpoint binary (macOS) |
+| `securityplugin-Windows.zip` | Full SecurityPlugin endpoint binary (Windows) |
 
 Each **plugin zip** contains:
-- `securityagent-plugin` — standalone DLP binary (no Python required)
+- `securityplugin-plugin` — standalone DLP binary (no Python required)
 - `index.ts` — OpenClaw plugin entry point
 - `openclaw.plugin.json` — plugin manifest
 - `install_openclaw_plugin.sh` — automated installer
@@ -101,43 +101,43 @@ openclaw gateway restart
 
 ```bash
 # Clone this repository
-git clone https://github.com/kaushikdharamshi/Securityagent_packages.git
-cd Securityagent_packages
+git clone https://github.com/kaushikdharamshi/SecurityPlugin_packages.git
+cd SecurityPlugin_packages
 ```
 
 ### Step 5: Unzip the Plugin for Your OS
 
 **macOS:**
 ```bash
-unzip securityagent-plugin-macOS.zip
-cd securityagent-plugin-macOS
+unzip securityplugin-plugin-macOS.zip
+cd securityplugin-plugin-macOS
 ```
 
 **Linux:**
 ```bash
-unzip securityagent-plugin-Linux.zip
-cd securityagent-plugin-Linux
+unzip securityplugin-plugin-Linux.zip
+cd securityplugin-plugin-Linux
 ```
 
 **Windows:**
 ```powershell
-Expand-Archive securityagent-plugin-Windows.zip -DestinationPath .
-cd securityagent-plugin-Windows
+Expand-Archive securityplugin-plugin-Windows.zip -DestinationPath .
+cd securityplugin-plugin-Windows
 ```
 
 ### Step 6: Install the Plugin
 
 ```bash
 # Make the binary executable
-chmod +x securityagent-plugin
+chmod +x securityplugin-plugin
 
 # Create the plugin directory
-mkdir -p ~/.openclaw/extensions/security-agent
+mkdir -p ~/.openclaw/extensions/security-plugin
 
 # Copy plugin files
-cp index.ts ~/.openclaw/extensions/security-agent/
-cp openclaw.plugin.json ~/.openclaw/extensions/security-agent/
-cp securityagent-plugin ~/.openclaw/extensions/security-agent/
+cp index.ts ~/.openclaw/extensions/security-plugin/
+cp openclaw.plugin.json ~/.openclaw/extensions/security-plugin/
+cp securityplugin-plugin ~/.openclaw/extensions/security-plugin/
 
 # Patch openclaw.json to deny native read/exec and allow the plugin
 python3 -c "
@@ -150,8 +150,8 @@ for t in ('read', 'exec'):
     if t not in cfg['tools']['deny']:
         cfg['tools']['deny'].append(t)
 cfg.setdefault('plugins', {}).setdefault('allow', [])
-if 'security-agent' not in cfg['plugins']['allow']:
-    cfg['plugins']['allow'].append('security-agent')
+if 'security-plugin' not in cfg['plugins']['allow']:
+    cfg['plugins']['allow'].append('security-plugin')
 with open(cfg_path, 'w') as f:
     json.dump(cfg, f, indent=2)
     f.write('\n')
@@ -160,18 +160,18 @@ print('openclaw.json patched')
 ```
 
 This will:
-1. Copy `index.ts`, `openclaw.plugin.json`, and the `securityagent-plugin` binary to `~/.openclaw/extensions/security-agent/`
+1. Copy `index.ts`, `openclaw.plugin.json`, and the `securityplugin-plugin` binary to `~/.openclaw/extensions/security-plugin/`
 2. Patch `openclaw.json` to deny native `read`/`exec` tools and allow the plugin
 
 **Smoke test the binary:**
 ```bash
-~/.openclaw/extensions/security-agent/securityagent-plugin --version
-# Expected: securityagent-plugin 1.0.0
+~/.openclaw/extensions/security-plugin/securityplugin-plugin --version
+# Expected: securityplugin-plugin 1.0.0
 
-~/.openclaw/extensions/security-agent/securityagent-plugin --exec "echo hello"
+~/.openclaw/extensions/security-plugin/securityplugin-plugin --exec "echo hello"
 # Expected: exit 0 (clean)
 
-~/.openclaw/extensions/security-agent/securityagent-plugin --exec "cat ~/.env"
+~/.openclaw/extensions/security-plugin/securityplugin-plugin --exec "cat ~/.env"
 # Expected: exit 1 (blocked, JSON error on stderr)
 ```
 
@@ -182,7 +182,7 @@ openclaw gateway restart
 
 # Verify plugin is loaded
 openclaw plugins list
-# Expected: security-agent -> loaded
+# Expected: security-plugin -> loaded
 ```
 
 ---
@@ -222,21 +222,21 @@ You can also test the binary directly from the command line:
 
 ```bash
 # Version check
-./securityagent-plugin --version
+./securityplugin-plugin --version
 
 # Clean command (exit 0)
-./securityagent-plugin --exec "ls /tmp"
+./securityplugin-plugin --exec "ls /tmp"
 
 # Blocked command (exit 1, JSON on stderr)
-./securityagent-plugin --exec "cat ~/.env"
+./securityplugin-plugin --exec "cat ~/.env"
 
 # Clean file read (content on stdout)
 echo "hello" > /tmp/test.txt
-./securityagent-plugin /tmp/test.txt
+./securityplugin-plugin /tmp/test.txt
 
 # Blocked file read — PII detected (exit 1)
 echo "SSN: 123-45-6789" > /tmp/test_pii.txt
-./securityagent-plugin /tmp/test_pii.txt
+./securityplugin-plugin /tmp/test_pii.txt
 ```
 
 ---
@@ -244,8 +244,8 @@ echo "SSN: 123-45-6789" > /tmp/test_pii.txt
 ## Uninstall
 
 ```bash
-# Remove the SecurityAgent plugin
-rm -rf ~/.openclaw/extensions/security-agent
+# Remove the SecurityPlugin plugin
+rm -rf ~/.openclaw/extensions/security-plugin
 
 # Remove tools.deny and plugins.allow entries from openclaw.json
 python3 -c "
@@ -262,8 +262,8 @@ if 'tools' in cfg and 'deny' in cfg['tools']:
     if not cfg['tools']['deny']: del cfg['tools']['deny']
     if not cfg['tools']: del cfg['tools']
 if 'plugins' in cfg and 'allow' in cfg['plugins']:
-    if 'security-agent' in cfg['plugins']['allow']:
-        cfg['plugins']['allow'].remove('security-agent')
+    if 'security-plugin' in cfg['plugins']['allow']:
+        cfg['plugins']['allow'].remove('security-plugin')
         changed = True
     if not cfg['plugins']['allow']: del cfg['plugins']['allow']
     if not cfg['plugins']: del cfg['plugins']
@@ -300,10 +300,10 @@ openclaw gateway restart
 
 ```bash
 # Check plugin directory exists
-ls ~/.openclaw/extensions/security-agent/
+ls ~/.openclaw/extensions/security-plugin/
 
 # Verify binary is executable
-chmod +x ~/.openclaw/extensions/security-agent/securityagent-plugin
+chmod +x ~/.openclaw/extensions/security-plugin/securityplugin-plugin
 
 # Restart gateway
 openclaw gateway restart
@@ -317,11 +317,11 @@ This happens when a conversation context gets corrupted mid-session. Fix: start 
 
 You downloaded the wrong OS package. Make sure you use the zip matching your operating system.
 
-### macOS: "securityagent-plugin cannot be opened because it is from an unidentified developer"
+### macOS: "securityplugin-plugin cannot be opened because it is from an unidentified developer"
 
 ```bash
 # Remove the quarantine attribute
-xattr -d com.apple.quarantine ./securityagent-plugin
+xattr -d com.apple.quarantine ./securityplugin-plugin
 ```
 
 ---
@@ -340,7 +340,7 @@ OpenClaw TUI -> native read tool (DENIED)
 Fallback -> secure_read (registered by plugin)
   |
   v
-index.ts -> spawns securityagent-plugin binary
+index.ts -> spawns securityplugin-plugin binary
   |
   v
 DLP Engine: Layer 1 (filename/path check) + Layer 2 (content scan)
