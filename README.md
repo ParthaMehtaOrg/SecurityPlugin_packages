@@ -20,6 +20,7 @@ SecurityPlugin is a DLP (Data Loss Prevention) plugin for [OpenClaw](https://ope
 | `securityplugin-plugin-Linux.zip` | OpenClaw DLP plugin binary (Linux) |
 | `securityplugin-macOS.zip` | Full SecurityPlugin endpoint binary (macOS) |
 | `securityplugin-Windows.zip` | Full SecurityPlugin endpoint binary (Windows) |
+| `securityplugin-Linux.zip` | Full SecurityPlugin endpoint binary (Linux) |
 
 Each **plugin zip** contains:
 - `securityplugin-plugin` — standalone DLP binary (no Python required)
