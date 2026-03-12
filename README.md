@@ -21,6 +21,8 @@ SecurityPlugin is a DLP (Data Loss Prevention) plugin for [OpenClaw](https://ope
 | `securityplugin-macOS.zip` | Full SecurityPlugin endpoint binary (macOS) |
 | `securityplugin-Windows.zip` | Full SecurityPlugin endpoint binary (Windows) |
 | `securityplugin-Linux.zip` | Full SecurityPlugin endpoint binary (Linux) |
+| `install.sh` | Automated installer (runs Steps 1–7) |
+| `uninstall.sh` | Automated uninstaller |
 
 Each **plugin zip** contains:
 - `securityplugin-plugin` — standalone DLP binary (no Python required)
@@ -272,6 +274,26 @@ echo "SSN: 123-45-6789" > /tmp/test_pii.txt
 ---
 
 ## Uninstall
+
+There are **two ways** to uninstall:
+
+| Method | Description |
+|--------|-------------|
+| **Automated (recommended)** | Run `uninstall.sh` — removes the plugin, cleans config, and optionally removes OpenClaw entirely |
+| **Manual** | Follow the steps below |
+
+### Automated Uninstall
+
+```bash
+chmod +x uninstall.sh
+./uninstall.sh
+```
+
+The script will remove the plugin files, clean `openclaw.json`, restart the gateway, and ask whether you also want to fully remove OpenClaw.
+
+---
+
+### Manual Uninstall
 
 ```bash
 # Remove the SecurityPlugin plugin
