@@ -1,0 +1,201 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+# ─── SecurityPlugin + OpenClaw automated installer ───
+# This script performs all the steps described in README.md (Steps 1–7).
+# Run from within the SecurityPlugin_packages directory:
+#   chmod +x install.sh && ./install.sh
+
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+YELLOW='\033[1;33m'
+CYAN='\033[0;36m'
+NC='\033[0m' # No Color
+
+info()  { echo -e "${CYAN}[INFO]${NC}  $*"; }
+ok()    { echo -e "${GREEN}[OK]${NC}    $*"; }
+warn()  { echo -e "${YELLOW}[WARN]${NC}  $*"; }
+fail()  { echo -e "${RED}[FAIL]${NC}  $*"; exit 1; }
+
+# ── Detect OS ──
+detect_os() {
+  case "$(uname -s)" in
+    Darwin*)  OS="macOS"   ;;
+    Linux*)   OS="Linux"   ;;
+    MINGW*|MSYS*|CYGWIN*) OS="Windows" ;;
+    *) fail "Unsupported operating system: $(uname -s)" ;;
+  esac
+  info "Detected OS: $OS"
+}
+
+# ── Step 1: Install OpenClaw ──
+install_openclaw() {
+  echo ""
+  echo -e "${CYAN}═══ Step 1: Install OpenClaw ═══${NC}"
+
+  if command -v openclaw &>/dev/null; then
+    ok "OpenClaw is already installed: $(openclaw --version 2>/dev/null || echo 'unknown version')"
+  else
+    info "Installing OpenClaw..."
+    if command -v npm &>/dev/null; then
+      npm install -g openclaw@latest
+    elif command -v pnpm &>/dev/null; then
+      pnpm add -g openclaw
+    else
+      fail "Neither npm nor pnpm found. Please install Node.js >= 22 first."
+    fi
+    ok "OpenClaw installed: $(openclaw --version 2>/dev/null || echo 'unknown version')"
+  fi
+}
+
+# ── Step 2: Configure OpenClaw Gateway ──
+configure_gateway() {
+  echo ""
+  echo -e "${CYAN}═══ Step 2: Configure OpenClaw Gateway ═══${NC}"
+
+  info "Setting gateway mode to local..."
+  openclaw config set gateway.mode local
+
+  info "Installing gateway as LaunchAgent..."
+  openclaw gateway install || warn "Gateway install returned non-zero (may already be installed)"
+
+  info "Restarting gateway..."
+  openclaw gateway restart
+
+  info "Checking gateway status..."
+  openclaw gateway status || warn "Could not verify gateway status"
+  ok "Gateway configured"
+}
+
+# ── Step 3: Configure LLM Provider ──
+configure_llm() {
+  echo ""
+  echo -e "${CYAN}═══ Step 3: Configure LLM Provider ═══${NC}"
+
+  echo -e "${YELLOW}OpenClaw needs an API key for your LLM provider.${NC}"
+  echo -e "${YELLOW}The interactive setup wizard will open now.${NC}"
+  echo ""
+
+  openclaw configure --section model
+
+  info "Restarting gateway to apply provider config..."
+  openclaw gateway restart
+  ok "LLM provider configured"
+}
+
+# ── Steps 4–6: Unzip & Install Plugin ──
+install_plugin() {
+  echo ""
+  echo -e "${CYAN}═══ Steps 4–6: Install SecurityPlugin ═══${NC}"
+
+  SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+  ZIP_FILE="$SCRIPT_DIR/securityplugin-plugin-${OS}.zip"
+
+  if [ ! -f "$ZIP_FILE" ]; then
+    fail "Plugin zip not found: $ZIP_FILE"
+  fi
+
+  # Create a temp directory for extraction
+  TMPDIR_EXTRACT="$(mktemp -d)"
+  trap "rm -rf '$TMPDIR_EXTRACT'" EXIT
+
+  info "Unzipping $ZIP_FILE..."
+  unzip -qo "$ZIP_FILE" -d "$TMPDIR_EXTRACT"
+
+  PLUGIN_SRC="$TMPDIR_EXTRACT/securityplugin-plugin-${OS}"
+  if [ ! -d "$PLUGIN_SRC" ]; then
+    # Some zips extract without the folder wrapper
+    PLUGIN_SRC="$TMPDIR_EXTRACT"
+  fi
+
+  PLUGIN_DEST="$HOME/.openclaw/extensions/security-plugin"
+  info "Installing plugin to $PLUGIN_DEST..."
+  mkdir -p "$PLUGIN_DEST"
+
+  cp "$PLUGIN_SRC/index.ts"               "$PLUGIN_DEST/"
+  cp "$PLUGIN_SRC/openclaw.plugin.json"    "$PLUGIN_DEST/"
+  cp "$PLUGIN_SRC/securityplugin-plugin"   "$PLUGIN_DEST/"
+  chmod +x "$PLUGIN_DEST/securityplugin-plugin"
+
+  # Remove macOS quarantine attribute if present
+  if [ "$OS" = "macOS" ]; then
+    xattr -d com.apple.quarantine "$PLUGIN_DEST/securityplugin-plugin" 2>/dev/null || true
+  fi
+
+  ok "Plugin files copied"
+
+  # Patch openclaw.json
+  info "Patching openclaw.json..."
+  python3 -c "
+import json, os
+cfg_path = os.path.expanduser('~/.openclaw/openclaw.json')
+with open(cfg_path) as f:
+    cfg = json.load(f)
+cfg.setdefault('tools', {}).setdefault('deny', [])
+for t in ('read', 'exec'):
+    if t not in cfg['tools']['deny']:
+        cfg['tools']['deny'].append(t)
+cfg.setdefault('plugins', {}).setdefault('allow', [])
+if 'security-plugin' not in cfg['plugins']['allow']:
+    cfg['plugins']['allow'].append('security-plugin')
+with open(cfg_path, 'w') as f:
+    json.dump(cfg, f, indent=2)
+    f.write('\n')
+"
+  ok "openclaw.json patched (native read/exec denied, security-plugin allowed)"
+
+  # Smoke test
+  info "Running smoke tests..."
+  if "$PLUGIN_DEST/securityplugin-plugin" --version &>/dev/null; then
+    ok "Binary version: $("$PLUGIN_DEST/securityplugin-plugin" --version 2>&1)"
+  else
+    warn "Binary version check failed — you may have downloaded the wrong OS package"
+  fi
+}
+
+# ── Step 7: Restart & Verify ──
+restart_and_verify() {
+  echo ""
+  echo -e "${CYAN}═══ Step 7: Restart OpenClaw & Verify ═══${NC}"
+
+  info "Restarting gateway..."
+  openclaw gateway restart
+
+  info "Listing plugins..."
+  openclaw plugins list || warn "Could not list plugins"
+  ok "Installation complete!"
+}
+
+# ── Summary ──
+print_summary() {
+  echo ""
+  echo -e "${GREEN}════════════════════════════════════════════${NC}"
+  echo -e "${GREEN}  SecurityPlugin installation complete!${NC}"
+  echo -e "${GREEN}════════════════════════════════════════════${NC}"
+  echo ""
+  echo "  Next steps:"
+  echo "    1. Run 'openclaw tui' to open the interactive chat"
+  echo "    2. Try: 'Read ~/.env'          — should be BLOCKED"
+  echo "    3. Try: 'Read README.md'       — should return content"
+  echo "    4. Try: 'Run: cat ~/.env'      — should be BLOCKED"
+  echo "    5. Try: 'Run: echo hello'      — should return 'hello'"
+  echo ""
+}
+
+# ── Main ──
+main() {
+  echo ""
+  echo -e "${CYAN}╔══════════════════════════════════════════════════╗${NC}"
+  echo -e "${CYAN}║   SecurityPlugin + OpenClaw Automated Installer  ║${NC}"
+  echo -e "${CYAN}╚══════════════════════════════════════════════════╝${NC}"
+
+  detect_os
+  install_openclaw
+  configure_gateway
+  configure_llm
+  install_plugin
+  restart_and_verify
+  print_summary
+}
+
+main "$@"

@@ -40,6 +40,35 @@ Each **plugin zip** contains:
 
 ## Installation
 
+There are **two ways** to complete the setup:
+
+| Method | Description |
+|--------|-------------|
+| **Automated (recommended)** | Run `install.sh` — a single script that performs all the steps below automatically |
+| **Manual** | Follow Step 1 through Step 7 below |
+
+### Automated Installation
+
+```bash
+# Clone this repository (if you haven't already)
+git clone https://github.com/kaushikdharamshi/SecurityPlugin_packages.git
+cd SecurityPlugin_packages
+
+# Run the installer
+chmod +x install.sh
+./install.sh
+```
+
+The script will detect your OS, install OpenClaw, configure the gateway, prompt you for your LLM provider API key, install the SecurityPlugin plugin, and verify everything is working.
+
+> Once the script finishes, skip to the [Verification](#verification) section to confirm everything is working.
+
+---
+
+### Manual Installation
+
+If you prefer to go through each step yourself, follow the instructions below.
+
 ### Step 1: Install OpenClaw
 
 **Option A — One-liner (recommended):**
