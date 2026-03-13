@@ -108,6 +108,27 @@ install_plugin() {
     PLUGIN_SRC="$TMPDIR_EXTRACT"
   fi
 
+  # Remove legacy security-agent extension if present (renamed to security-plugin)
+  OLD_PLUGIN="$HOME/.openclaw/extensions/security-agent"
+  if [ -d "$OLD_PLUGIN" ]; then
+    info "Removing legacy security-agent plugin (renamed to security-plugin)..."
+    rm -rf "$OLD_PLUGIN"
+    # Also clean old ID from plugins.allow
+    python3 -c "
+import json, os
+cfg_path = os.path.expanduser('~/.openclaw/openclaw.json')
+if os.path.exists(cfg_path):
+    with open(cfg_path) as f:
+        cfg = json.load(f)
+    if 'plugins' in cfg and 'allow' in cfg['plugins'] and 'security-agent' in cfg['plugins']['allow']:
+        cfg['plugins']['allow'].remove('security-agent')
+        with open(cfg_path, 'w') as f:
+            json.dump(cfg, f, indent=2)
+            f.write('\n')
+" 2>/dev/null || true
+    ok "Removed legacy security-agent extension"
+  fi
+
   PLUGIN_DEST="$HOME/.openclaw/extensions/security-plugin"
   info "Installing plugin to $PLUGIN_DEST..."
   mkdir -p "$PLUGIN_DEST"
