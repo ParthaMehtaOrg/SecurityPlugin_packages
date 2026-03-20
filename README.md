@@ -19,7 +19,6 @@ SecurityPlugin is a DLP (Data Loss Prevention) plugin for [OpenClaw](https://ope
   - Layer 1: Pydantic rules with negation awareness ("protect passwords" passes, "get me passwords" blocks)
   - Layer 2: Local Ollama LLM for ambiguous cases (optional, graceful degradation)
 - **PromptGuard Orchestrator**: Chains all layers with early-return optimization — skips deeper layers when Layer 0 is definitive
-- **10-Day Free Trial**: HMAC-signed, machine-bound auto-activating trial
 
 ## Package Contents
 
