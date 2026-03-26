@@ -46,6 +46,14 @@ Each **plugin zip** contains:
 - **Node.js** >= 22 (`node --version`)
 - **npm** (`npm --version`)
 - **OpenClaw** installed globally (`npm install -g openclaw@latest`)
+- **Ollama** (optional, required for Layer 2 semantic prompt analysis)
+
+  Install from [https://ollama.com/download](https://ollama.com/download), then pull a model:
+  ```bash
+  ollama pull llama3
+  ollama serve   # keep running in the background
+  ```
+  > If Ollama is not running, Layer 2 prompt analysis is skipped — Layers 0 and 1 still protect you. No action required if you don't need semantic analysis.
 
 ---
 
