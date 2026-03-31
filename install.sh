@@ -17,6 +17,26 @@ ok()    { echo -e "${GREEN}[OK]${NC}    $*"; }
 warn()  { echo -e "${YELLOW}[WARN]${NC}  $*"; }
 fail()  { echo -e "${RED}[FAIL]${NC}  $*"; exit 1; }
 
+# openclaw CLI hangs after completing when plugins keep the Node.js event
+# loop alive.  We give the command up to 15s to finish, then force-kill.
+oc() {
+  openclaw "$@" &
+  local pid=$!
+  local elapsed=0
+  while kill -0 "$pid" 2>/dev/null && [ "$elapsed" -lt 30 ]; do
+    sleep 0.5
+    elapsed=$((elapsed + 1))
+  done
+  if kill -0 "$pid" 2>/dev/null; then
+    kill "$pid" 2>/dev/null
+    wait "$pid" 2>/dev/null || true
+    return 0
+  fi
+  local rc=0
+  wait "$pid" 2>/dev/null || rc=$?
+  return "$rc"
+}
+
 # ── Detect OS ──
 detect_os() {
   case "$(uname -s)" in
@@ -38,7 +58,7 @@ install_openclaw() {
   else
     info "Installing OpenClaw..."
     if command -v npm &>/dev/null; then
-      npm install -g openclaw@latest
+      npm install -g openclaw@latest --no-fund --no-deprecated 2>&1
     elif command -v pnpm &>/dev/null; then
       pnpm add -g openclaw
     else
@@ -54,16 +74,16 @@ configure_gateway() {
   echo -e "${CYAN}═══ Step 2: Configure OpenClaw Gateway ═══${NC}"
 
   info "Setting gateway mode to local..."
-  openclaw config set gateway.mode local
+  oc config set gateway.mode local || warn "config set returned non-zero (may be fine)"
 
   info "Installing gateway as LaunchAgent..."
-  openclaw gateway install || warn "Gateway install returned non-zero (may already be installed)"
+  oc gateway install || warn "Gateway install returned non-zero (may already be installed)"
 
   info "Restarting gateway..."
-  openclaw gateway restart
+  oc gateway restart || warn "Gateway restart returned non-zero (may be fine)"
 
   info "Checking gateway status..."
-  openclaw gateway status || warn "Could not verify gateway status"
+  oc gateway status || warn "Could not verify gateway status"
   ok "Gateway configured"
 }
 
@@ -72,15 +92,60 @@ configure_llm() {
   echo ""
   echo -e "${CYAN}═══ Step 3: Configure LLM Provider ═══${NC}"
 
-  echo -e "${YELLOW}OpenClaw needs an API key for your LLM provider.${NC}"
-  echo -e "${YELLOW}The interactive setup wizard will open now.${NC}"
-  echo ""
+  # Skip if a model provider is already configured
+  if grep -qE '"(apiKey|api_key|ANTHROPIC_API_KEY|models)"' "$HOME/.openclaw/openclaw.json" 2>/dev/null; then
+    ok "LLM provider already configured (found existing provider config)"
+    return 0
+  fi
 
-  openclaw configure --section model
+  # Supported providers
+  echo ""
+  echo "  Select your LLM provider:"
+  echo "    1) Anthropic"
+  echo "    2) OpenAI"
+  echo "    3) Ollama (local)"
+  echo ""
+  read -rp "  Provider [1]: " PROVIDER_CHOICE
+  PROVIDER_CHOICE="${PROVIDER_CHOICE:-1}"
+
+  case "$PROVIDER_CHOICE" in
+    1)
+      PROVIDER="anthropic"
+      DEFAULT_MODEL="anthropic/claude-sonnet-4-6"
+      ;;
+    2)
+      PROVIDER="openai"
+      DEFAULT_MODEL="openai/gpt-4o"
+      ;;
+    3)
+      PROVIDER="ollama"
+      DEFAULT_MODEL="ollama/llama3"
+      ;;
+    *)
+      fail "Invalid provider choice: $PROVIDER_CHOICE"
+      ;;
+  esac
+
+  # For Ollama, no API key needed
+  if [ "$PROVIDER" = "ollama" ]; then
+    info "Ollama selected — no API key required"
+  else
+    echo ""
+    read -rsp "  Enter $PROVIDER API key: " API_KEY
+    echo ""
+    if [ -z "$API_KEY" ]; then
+      fail "API key cannot be empty"
+    fi
+    info "Storing API key for $PROVIDER..."
+    echo "$API_KEY" | oc models auth paste-token --provider "$PROVIDER"
+  fi
+
+  info "Setting default model to $DEFAULT_MODEL..."
+  oc config set agents.defaults.model.primary "$DEFAULT_MODEL"
 
   info "Restarting gateway to apply provider config..."
-  openclaw gateway restart
-  ok "LLM provider configured"
+  oc gateway restart || warn "Gateway restart returned non-zero"
+  ok "LLM provider configured: $DEFAULT_MODEL"
 }
 
 # ── Steps 4–6: Unzip & Install Plugin ──
@@ -180,10 +245,10 @@ restart_and_verify() {
   echo -e "${CYAN}═══ Step 7: Restart OpenClaw & Verify ═══${NC}"
 
   info "Restarting gateway..."
-  openclaw gateway restart
+  oc gateway restart || warn "Gateway restart returned non-zero"
 
   info "Listing plugins..."
-  openclaw plugins list || warn "Could not list plugins"
+  oc plugins list || warn "Could not list plugins"
   ok "Installation complete!"
 }
 
