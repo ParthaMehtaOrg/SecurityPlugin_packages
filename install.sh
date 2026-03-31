@@ -58,7 +58,7 @@ install_openclaw() {
   else
     info "Installing OpenClaw..."
     if command -v npm &>/dev/null; then
-      npm install -g openclaw@latest --no-fund --no-deprecated 2>&1
+      npm install -g openclaw@latest --no-fund 2>&1
     elif command -v pnpm &>/dev/null; then
       pnpm add -g openclaw
     else
@@ -98,54 +98,17 @@ configure_llm() {
     return 0
   fi
 
-  # Supported providers
+  echo -e "${YELLOW}OpenClaw needs an API key for your LLM provider.${NC}"
+  echo -e "${YELLOW}The interactive setup wizard will open now.${NC}"
+  echo -e "${YELLOW}(If the wizard hangs after completing, press Ctrl-C to continue.)${NC}"
   echo ""
-  echo "  Select your LLM provider:"
-  echo "    1) Anthropic"
-  echo "    2) OpenAI"
-  echo "    3) Ollama (local)"
-  echo ""
-  read -rp "  Provider [1]: " PROVIDER_CHOICE
-  PROVIDER_CHOICE="${PROVIDER_CHOICE:-1}"
 
-  case "$PROVIDER_CHOICE" in
-    1)
-      PROVIDER="anthropic"
-      DEFAULT_MODEL="anthropic/claude-sonnet-4-6"
-      ;;
-    2)
-      PROVIDER="openai"
-      DEFAULT_MODEL="openai/gpt-4o"
-      ;;
-    3)
-      PROVIDER="ollama"
-      DEFAULT_MODEL="ollama/llama3"
-      ;;
-    *)
-      fail "Invalid provider choice: $PROVIDER_CHOICE"
-      ;;
-  esac
-
-  # For Ollama, no API key needed
-  if [ "$PROVIDER" = "ollama" ]; then
-    info "Ollama selected — no API key required"
-  else
-    echo ""
-    read -rsp "  Enter $PROVIDER API key: " API_KEY
-    echo ""
-    if [ -z "$API_KEY" ]; then
-      fail "API key cannot be empty"
-    fi
-    info "Storing API key for $PROVIDER..."
-    echo "$API_KEY" | oc models auth paste-token --provider "$PROVIDER"
-  fi
-
-  info "Setting default model to $DEFAULT_MODEL..."
-  oc config set agents.defaults.model.primary "$DEFAULT_MODEL"
+  # Must run in foreground for interactive terminal control
+  openclaw configure --section model || true
 
   info "Restarting gateway to apply provider config..."
   oc gateway restart || warn "Gateway restart returned non-zero"
-  ok "LLM provider configured: $DEFAULT_MODEL"
+  ok "LLM provider configured"
 }
 
 # ── Steps 4–6: Unzip & Install Plugin ──
