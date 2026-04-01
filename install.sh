@@ -56,10 +56,18 @@ install_openclaw() {
   if command -v openclaw &>/dev/null; then
     ok "OpenClaw is already installed: $(openclaw --version 2>/dev/null || echo 'unknown version')"
     # Check for updates
-    CURRENT=$(openclaw --version 2>/dev/null | tr -d 'v')
+    CURRENT=$(openclaw --version 2>/dev/null | awk '{print $2}')
     LATEST=$(npm view openclaw version 2>/dev/null)
     if [ -n "$LATEST" ] && [ "$CURRENT" != "$LATEST" ]; then
-      warn "OpenClaw update available: v$LATEST (current: v$CURRENT). Run: openclaw update"
+      warn "OpenClaw update available: v$LATEST (current: v$CURRENT)"
+      read -rp "  Do you want to update now? [y/N]: " answer
+      if [[ "$answer" =~ ^[Yy]$ ]]; then
+        info "Updating OpenClaw..."
+        npm install -g openclaw@latest --no-fund 2>&1
+        ok "OpenClaw updated to v$LATEST"
+      else
+        info "Skipping update, continuing with v$CURRENT"
+      fi
     fi
   else
     info "Installing OpenClaw..."
