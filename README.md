@@ -12,7 +12,11 @@ SecurityPlugin is a DLP (Data Loss Prevention) plugin for [OpenClaw](https://ope
 - Data exfiltration attempts (piping secrets to curl/wget/netcat)
 - Prompts requesting sensitive data ("get all SSNs", "extract credit card numbers", etc.)
 
-### v2.1.0 — What's New
+### v3.0.0 — What's New
+
+- **Obsidian Memory Map**: A persistent, vendor-agnostic memory system for OpenClaw agents. The AI reads memory from workspace files injected into the system prompt — works with any LLM backend. Includes an Obsidian vault with daily logs, long-term memory, a second-brain knowledge base, and QMD semantic search. See the [SecurityAgent repo](https://github.com/kaushikdharamshi/SecurityAgent/tree/version-V3) for full setup instructions.
+
+### v2.1.0
 
 - **Prompt injection detection**: Blocks "ignore all previous instructions" and variants (disregard/forget/override + previous/prior/all + instructions/directives/prompt)
 - **System prompt extraction detection**: Blocks "reveal/show/leak/expose your system prompt" and variants
