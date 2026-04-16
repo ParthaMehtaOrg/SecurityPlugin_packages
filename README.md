@@ -14,7 +14,7 @@ SecurityPlugin is a DLP (Data Loss Prevention) plugin for [OpenClaw](https://ope
 
 ### v3.0.0 — What's New
 
-- **Obsidian Memory Map**: A persistent, vendor-agnostic memory system for OpenClaw agents. The AI reads memory from workspace files injected into the system prompt — works with any LLM backend. Includes an Obsidian vault with daily logs, long-term memory, a second-brain knowledge base, and QMD semantic search. See the [SecurityAgent repo](https://github.com/kaushikdharamshi/SecurityAgent/tree/version-V3) for full setup instructions.
+- **Obsidian Memory Map**: A persistent, vendor-agnostic memory system for OpenClaw agents. The AI reads memory from workspace files injected into the system prompt — works with any LLM backend. Includes an Obsidian vault with daily logs, long-term memory, a second-brain knowledge base, and QMD semantic search. See the [Obsidian Memory Map Setup](#obsidian-memory-map-setup) section below and the [`obsidianMemory/`](obsidianMemory/) folder for full files.
 
 ### v2.1.0
 
@@ -43,6 +43,8 @@ SecurityPlugin is a DLP (Data Loss Prevention) plugin for [OpenClaw](https://ope
 | `securityplugin-Linux.zip` | Full SecurityPlugin endpoint binary (Linux) |
 | `install.sh` | Automated installer (runs Steps 1–7) |
 | `uninstall.sh` | Automated uninstaller |
+| `obsidianMemory/` | Obsidian Memory Map vault, docs, and architecture (v3.0.0) |
+| `clawd/Templater` | Obsidian Templater template for daily session logging |
 
 Each **plugin zip** contains:
 - `securityplugin-plugin` — standalone DLP binary (no Python required)
@@ -414,6 +416,68 @@ You downloaded the wrong OS package. Make sure you use the zip matching your ope
 # Remove the quarantine attribute
 xattr -d com.apple.quarantine ./securityplugin-plugin
 ```
+
+---
+
+## Obsidian Memory Map Setup
+
+The Obsidian Memory Map (v3.0.0) gives your OpenClaw agent persistent memory across sessions. The AI doesn't *have* memory — it *reads* memory from workspace files injected into the system prompt.
+
+**Three components:**
+- **OpenClaw** — reads workspace files at session start (injected into system prompt)
+- **Obsidian** — vault pointed at the workspace; Graph View shows connections between files
+- **QMD** — on-device semantic search; find relevant context without loading everything
+
+### Quick Start
+
+```bash
+# 1. Copy the vault to your workspace
+cp -r obsidianMemory/ObsidianVault ~/clawd/
+
+# 2. Copy the Templater template
+cp -r clawd/Templater ~/clawd/
+
+# 3. Open Obsidian → File → Open Vault → select ~/clawd/
+```
+
+### Vault Structure
+
+| File/Folder | Purpose |
+|---|---|
+| `MEMORY.md` | Curated long-term memory (distilled from daily logs) |
+| `daily-logs/YYYY-MM-DD.md` | Raw daily session logs |
+| `second-brain/ideas/` | Ideas and notes |
+| `second-brain/people/` | People knowledge base |
+| `second-brain/projects/` | Project tracking |
+| `templates/daily-log.md` | Daily note template |
+
+### Obsidian Plugins (Recommended)
+
+1. **Dataview** — query memory files like a database
+2. **Templater** — auto-generate daily notes with the included template
+
+### QMD Semantic Search
+
+```bash
+# Index your workspace
+qmd collection add ~/clawd --name clawd
+qmd embed
+
+# Search from OpenClaw
+mcporter call qmd.vsearch query="what did we decide about X"
+```
+
+### How It Works
+
+1. OpenClaw reads workspace files and injects them into the system prompt at session start
+2. The AI "wakes up" each session knowing what's in those files
+3. During the session, important context gets written to `daily-logs/YYYY-MM-DD.md`
+4. Periodically, key insights are distilled from daily logs into `MEMORY.md`
+5. Obsidian's Graph View shows how all memory files connect
+
+> **Key principle:** Write important things to files, not just say them in chat. If it's in a file, the AI remembers it next session.
+
+For full documentation, see [`obsidianMemory/SKILL.md`](obsidianMemory/SKILL.md).
 
 ---
 
