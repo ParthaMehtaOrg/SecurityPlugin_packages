@@ -12,6 +12,16 @@ SecurityPlugin is a DLP (Data Loss Prevention) plugin for [OpenClaw](https://ope
 - Data exfiltration attempts (piping secrets to curl/wget/netcat)
 - Prompts requesting sensitive data ("get all SSNs", "extract credit card numbers", etc.)
 
+### v4.0.0 — What's New
+
+- **False-positive elimination**: Rewrote DLP exec rules to eliminate false positives. Generic config filenames (settings.py, config.json) no longer blocked by name. Healthcare DLP patterns (ICD-10, Passport, DEA) require labeled context. Workspace files skip content scanning.
+- **Hook architecture upgrade**: Migrated to stdin JSON contract for Claude Code hooks. Added JSONL audit logging, LLM verification for low-confidence rules, and quoted-context stripping.
+- **System prompt masking**: Strips hostname, OS, username, and repo paths from system messages before they reach the LLM.
+- **Media attachment filtering**: Blocks image/audio/video content parts from multi-part messages.
+- **AES-256-GCM session encryption**: Encrypts audit log entries and session data at rest.
+- **Modifying output pipeline**: Redacts PII in LLM responses in-place instead of blocking the entire response.
+- **Core package extraction**: DLP engine extracted to securityagent-core for reuse across projects.
+
 ### v3.0.0 — What's New
 
 - **Obsidian Memory Map**: A persistent, vendor-agnostic memory system for OpenClaw agents. The AI reads memory from workspace files injected into the system prompt — works with any LLM backend. Includes an Obsidian vault with daily logs, long-term memory, a second-brain knowledge base, and QMD semantic search. See the [Obsidian Memory Map Setup](#obsidian-memory-map-setup) section below and the [`obsidianMemory/`](obsidianMemory/) folder for full files.
